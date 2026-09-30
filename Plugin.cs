@@ -1,3 +1,4 @@
+using Dalamud.Configuration;
 using Dalamud.Game.Command;
 using Dalamud.Interface.Windowing;
 using Dalamud.Plugin;
@@ -43,7 +44,8 @@ public sealed class Plugin : IDalamudPlugin
     private void SaveConfig() => pluginInterface.SavePluginConfig(config);
 }
 
-public sealed class PluginConfig
+public sealed class PluginConfig : IPluginConfiguration
 {
+    public int Version { get; set; } = 1;
     public List<string> FavoriteStyleIds { get; set; } = [];
 }

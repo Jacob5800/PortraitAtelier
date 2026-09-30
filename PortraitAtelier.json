@@ -2,7 +2,7 @@
   "Author": "Jacob5800",
   "Name": "Portrait Atelier",
   "InternalName": "PortraitAtelier",
-  "AssemblyVersion": "0.1.0.0",
+  "AssemblyVersion": "0.1.1.0",
   "Description": "Find curated portrait looks, generate variations from your own portrait, and preview them in the game's editor.",
   "ApplicableVersion": "any",
   "Tags": ["portrait", "adventurer-plate", "photography"],
