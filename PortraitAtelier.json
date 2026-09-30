@@ -1,0 +1,17 @@
+{
+  "Author": "Jacob5800",
+  "Name": "Portrait Atelier",
+  "InternalName": "PortraitAtelier",
+  "AssemblyVersion": "0.1.0.0",
+  "Description": "Find curated portrait looks, generate variations from your own portrait, and preview them in the game's editor.",
+  "ApplicableVersion": "any",
+  "Tags": ["portrait", "adventurer-plate", "photography"],
+  "RepoUrl": "https://github.com/Jacob5800/PortraitAtelier",
+  "DalamudApiLevel": 15,
+  "LoadRequiredState": 0,
+  "LoadSync": false,
+  "CanUnloadAsync": true,
+  "LoadPriority": 0,
+  "Punchline": "Build and apply a portrait look from curated styles.",
+  "AcceptsFeedback": true
+}
