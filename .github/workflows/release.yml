@@ -30,6 +30,9 @@ jobs:
       - name: Restore
         run: dotnet restore PortraitAtelier.csproj
 
+      - name: Verify portrait transformations
+        run: dotnet run --project checks/PortraitAtelier.Checks.csproj --configuration Release
+
       - name: Build and package
         run: dotnet build PortraitAtelier.csproj --no-restore --configuration Release
 

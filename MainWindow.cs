@@ -22,6 +22,7 @@ internal sealed class MainWindow : Window
     private float strength = 0.85f;
     private int variation;
     private bool favoritesOnly;
+    private readonly PortraitDesignSession automaticSession = new();
 
     public MainWindow(PluginConfig config, Action saveConfig, PortraitEditorBridge editorBridge) : base("Portrait Atelier")
     {
@@ -37,7 +38,23 @@ internal sealed class MainWindow : Window
     public override void Draw()
     {
         CompleteCatalogRefresh();
-        ImGui.TextWrapped("Generate a new portrait look from your current in-game portrait. The generator preserves your pose, expression, animation, frame and decoration while changing lighting and camera distance.");
+        ImGui.TextWrapped("Build a portrait look using lighting, framing and your unlocked poses, expressions and designs.");
+        var styleCharacter = config.StylePoseAndExpression;
+        if (ImGui.Checkbox("Choose pose and expression", ref styleCharacter))
+        {
+            config.StylePoseAndExpression = styleCharacter;
+            saveConfig();
+        }
+        var styleDesign = config.StyleOwnedDesign;
+        if (ImGui.Checkbox("Choose owned background, frame and decoration", ref styleDesign))
+        {
+            config.StyleOwnedDesign = styleDesign;
+            saveConfig();
+        }
+        if (ImGui.Button("Make a portrait for me"))
+            CreateAndApplyRecommended();
+        ImGui.TextWrapped("Open the game's Portrait Editor and wait for the character preview. This button applies a full-strength look. Review it, then use the game's Save button to keep it.");
+        ImGui.TextWrapped(status);
         ImGui.TextDisabled("Applying changes only the open editor. It never presses the game's save button.");
         ImGui.Separator();
 
@@ -50,6 +67,18 @@ internal sealed class MainWindow : Window
         DrawOutput();
     }
 
+    public override void OnOpen()
+    {
+        config.WindowOpen = true;
+        saveConfig();
+    }
+
+    public override void OnClose()
+    {
+        config.WindowOpen = false;
+        saveConfig();
+    }
+
     private void DrawBasePreset()
     {
         ImGui.Text("1. Capture your current portrait");
@@ -59,6 +88,7 @@ internal sealed class MainWindow : Window
             if (editorBridge.TryCapture(out var captured, out var error))
             {
                 basePreset = captured;
+                automaticSession.Reset();
                 basePresetFromCode = false;
                 generatedCode = "";
                 generatedPreset = null;
@@ -83,6 +113,7 @@ internal sealed class MainWindow : Window
             if (PortraitPreset.TryParse(shareCodeInput, out var imported, out var error))
             {
                 basePreset = imported;
+                automaticSession.Reset();
                 basePresetFromCode = true;
                 generatedPreset = null;
                 generatedCode = "";
@@ -166,9 +197,11 @@ internal sealed class MainWindow : Window
     {
         ImGui.Text("3. Generate a variation");
         ImGui.SetNextItemWidth(330f);
-        ImGui.SliderFloat("Style strength", ref strength, 0f, 1f, "%.0f%%", ImGuiSliderFlags.None);
+        var strengthPercent = strength * 100f;
+        if (ImGui.SliderFloat("Style strength", ref strengthPercent, 0f, 100f, "%.0f%%", ImGuiSliderFlags.None))
+            strength = strengthPercent / 100f;
         strength = Math.Clamp(strength, 0f, 1f);
-        ImGui.TextDisabled("Higher strength moves the lighting and crop closer to the selected look.");
+        ImGui.TextDisabled("Higher strength moves the lighting, crop and gentle framing closer to the selected look.");
 
         if (ImGui.Button("Generate"))
             GenerateNext();
@@ -176,7 +209,7 @@ internal sealed class MainWindow : Window
         if (ImGui.Button("Generate another take"))
             GenerateNext();
         ImGui.SameLine();
-        ImGui.TextDisabled(variation == 0 ? "Take 1" : $"Take {variation + 1}");
+        ImGui.TextDisabled(variation == 0 ? "No take generated yet" : $"Take {variation}");
     }
 
     private void DrawOutput()
@@ -197,8 +230,13 @@ internal sealed class MainWindow : Window
             {
                 status = "Generate a look before applying it.";
             }
-            else if (editorBridge.TryApply(generatedPreset, out var error))
+            else if (editorBridge.TryApply(generatedPreset, out var error, config.StylePoseAndExpression))
             {
+                if (editorBridge.TryCapture(out var actual, out _) && actual is not null)
+                {
+                    generatedPreset = actual;
+                    generatedCode = actual.ToShareCode();
+                }
                 status = AppendApplyWarning("Applied to the open editor. Review it there and use the game's own save button if you want to keep it.", error);
             }
             else
@@ -224,10 +262,52 @@ internal sealed class MainWindow : Window
         }
 
         var styled = basePreset.WithStyle(selectedStyle, strength, variation);
+        if (strength > 0)
+            styled = editorBridge.StyleOptions(styled, selectedStyle, variation, config.StylePoseAndExpression, config.StyleOwnedDesign);
         generatedPreset = styled;
         generatedCode = styled.ToShareCode();
         variation++;
-        status = $"Generated {selectedStyle.Name}. Your original pose, expression, banner elements and animation are retained.";
+        status = $"Generated {selectedStyle.Name}. Enabled character and design choices use unlocked options from the open editor.";
+    }
+
+    private void CreateAndApplyRecommended()
+    {
+        if (!editorBridge.TryCapture(out var captured, out var captureError) || captured is null)
+        {
+            status = captureError;
+            return;
+        }
+
+        basePreset = automaticSession.BaseFor(captured);
+        basePresetFromCode = false;
+        var automaticStyles = PortraitStyle.Featured;
+        var index = (int)((uint)config.NextAutomaticStyleIndex % (uint)automaticStyles.Count);
+        selectedStyle = automaticStyles[index];
+        variation = 0;
+        generatedPreset = basePreset.WithStyle(selectedStyle, 1f, variation);
+        generatedPreset = editorBridge.StyleOptions(generatedPreset, selectedStyle, variation, config.StylePoseAndExpression, config.StyleOwnedDesign);
+        if (!config.StylePoseAndExpression)
+            generatedPreset = generatedPreset with { BannerTimeline = captured.BannerTimeline, Expression = captured.Expression, AnimationProgress = captured.AnimationProgress };
+        if (!config.StyleOwnedDesign)
+            generatedPreset = generatedPreset with { BackgroundId = captured.BackgroundId, FrameId = captured.FrameId, DecorationId = captured.DecorationId };
+        generatedCode = generatedPreset.ToShareCode();
+        variation++;
+
+        if (!editorBridge.TryApply(generatedPreset, out var applyError, config.StylePoseAndExpression))
+        {
+            status = $"Generated {selectedStyle.Name}, but could not apply it: {applyError}";
+            return;
+        }
+
+        config.NextAutomaticStyleIndex = (index + 1) % automaticStyles.Count;
+        if (editorBridge.TryCapture(out var actual, out _) && actual is not null)
+        {
+            automaticSession.Remember(basePreset, actual);
+            generatedPreset = actual;
+            generatedCode = actual.ToShareCode();
+        }
+        saveConfig();
+        status = AppendApplyWarning($"Made and applied {selectedStyle.Name}. Review it, then use the game's save button if you want to keep it.", applyError);
     }
 
     private IReadOnlyList<PortraitStyle> GetVisibleStyles()

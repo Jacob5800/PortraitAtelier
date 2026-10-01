@@ -1,10 +1,10 @@
 <Project Sdk="Dalamud.NET.Sdk/15.0.0">
   <PropertyGroup>
-    <Version>0.1.2.0</Version>
+    <Version>0.1.3.0</Version>
     <Author>Jacob5800</Author>
     <Name>Portrait Atelier</Name>
-    <Punchline>Build and apply a portrait look from curated styles.</Punchline>
-    <Description>Find curated portrait looks, generate variations from your own portrait, and preview them in the game's editor.</Description>
+    <Punchline>Make and apply a portrait in one click.</Punchline>
+    <Description>Create and apply curated portrait designs from your own character in one click.</Description>
     <Tags>portrait;adventurer-plate;style;photography</Tags>
     <RepoUrl>https://github.com/Jacob5800/PortraitAtelier</RepoUrl>
     <OutputPath>$(MSBuildProjectDirectory)\dist\$(Configuration)\</OutputPath>
@@ -13,6 +13,9 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
+  <ItemGroup>
+    <Compile Remove="checks/**/*.cs" />
+  </ItemGroup>
   <Target Name="PackagePlugin" AfterTargets="Build" Condition="'$(Configuration)' == 'Release'">
     <DalamudPackager
       ProjectDir="$(ProjectDir)"

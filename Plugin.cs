@@ -15,12 +15,13 @@ public sealed class Plugin : IDalamudPlugin
     private readonly PluginConfig config;
     private readonly MainWindow mainWindow;
 
-    public Plugin(IDalamudPluginInterface pluginInterface, ICommandManager commandManager, ICondition condition)
+    public Plugin(IDalamudPluginInterface pluginInterface, ICommandManager commandManager, ICondition condition, IGameGui gameGui, IDataManager dataManager)
     {
         this.pluginInterface = pluginInterface;
         this.commandManager = commandManager;
         config = pluginInterface.GetPluginConfig() as PluginConfig ?? new PluginConfig();
-        mainWindow = new MainWindow(config, SaveConfig, new PortraitEditorBridge(condition));
+        mainWindow = new MainWindow(config, SaveConfig, new PortraitEditorBridge(condition, gameGui, dataManager));
+        mainWindow.IsOpen = config.WindowOpen;
         windowSystem.AddWindow(mainWindow);
 
         pluginInterface.UiBuilder.Draw += windowSystem.Draw;
@@ -48,4 +49,8 @@ public sealed class PluginConfig : IPluginConfiguration
 {
     public int Version { get; set; } = 1;
     public List<string> FavoriteStyleIds { get; set; } = [];
+    public int NextAutomaticStyleIndex { get; set; }
+    public bool WindowOpen { get; set; } = true;
+    public bool StylePoseAndExpression { get; set; } = true;
+    public bool StyleOwnedDesign { get; set; } = true;
 }

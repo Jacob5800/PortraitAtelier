@@ -135,14 +135,26 @@ public sealed record PortraitPreset
             DecorationId = reader.ReadUInt16(),
         };
 
-        if (!float.IsFinite(preset.AnimationProgress)
-            || !IsFinite(preset.CameraPosition)
-            || !IsFinite(preset.CameraTarget)
-            || !IsFinite(preset.HeadDirection)
-            || !IsFinite(preset.EyeDirection))
+        if (!preset.TryValidate(out error))
         {
             preset = null;
-            error = "The preset contains an invalid camera, animation, or direction value.";
+            return false;
+        }
+
+        return true;
+    }
+
+    public bool TryValidate(out string error)
+    {
+        error = "";
+        if (!float.IsFinite(AnimationProgress) || AnimationProgress < 0
+            || !IsFinite(CameraPosition) || !IsFinite(CameraTarget)
+            || !IsFinite(HeadDirection) || !IsFinite(EyeDirection)
+            || ImageRotation is < -90 or > 90 || CameraZoom > 200
+            || DirectionalVerticalAngle is < -180 or > 180
+            || DirectionalHorizontalAngle is < -180 or > 180)
+        {
+            error = "The preset contains an invalid camera, animation, rotation, zoom or lighting angle.";
             return false;
         }
 
@@ -157,32 +169,46 @@ public sealed record PortraitPreset
         var directional = Jitter(style.DirectionalColor, random, variation == 0 ? 0 : 10);
         var ambient = Jitter(style.AmbientColor, random, variation == 0 ? 0 : 10);
         var position = ScaleCameraDistance(CameraPosition, CameraTarget, Lerp(1f, style.CameraDistance, strength));
+        var target = OffsetCameraTarget(CameraTarget, CameraPosition, style.CameraTargetOffset * strength);
 
         return this with
         {
             CameraPosition = position,
+            CameraTarget = target,
             DirectionalRed = (byte)Blend(DirectionalRed, directional.Red, strength),
             DirectionalGreen = (byte)Blend(DirectionalGreen, directional.Green, strength),
             DirectionalBlue = (byte)Blend(DirectionalBlue, directional.Blue, strength),
-            DirectionalBrightness = ScaleByte(DirectionalBrightness, Lerp(1f, style.DirectionalBrightness, strength)),
+            DirectionalBrightness = StyleBrightness(DirectionalBrightness, style.DirectionalBrightness, strength),
             AmbientRed = (byte)Blend(AmbientRed, ambient.Red, strength),
             AmbientGreen = (byte)Blend(AmbientGreen, ambient.Green, strength),
             AmbientBlue = (byte)Blend(AmbientBlue, ambient.Blue, strength),
-            AmbientBrightness = ScaleByte(AmbientBrightness, Lerp(1f, style.AmbientBrightness, strength)),
+            AmbientBrightness = StyleBrightness(AmbientBrightness, style.AmbientBrightness, strength),
         };
     }
 
     private static Half4 ScaleCameraDistance(Half4 position, Half4 target, float scale) => new(
-        (Half)((float)target.X + ((float)position.X - (float)target.X) * scale),
-        (Half)((float)target.Y + ((float)position.Y - (float)target.Y) * scale),
-        (Half)((float)target.Z + ((float)position.Z - (float)target.Z) * scale),
+        SafeHalf((float)target.X + ((float)position.X - (float)target.X) * scale),
+        SafeHalf((float)target.Y + ((float)position.Y - (float)target.Y) * scale),
+        SafeHalf((float)target.Z + ((float)position.Z - (float)target.Z) * scale),
         position.W);
+
+    private static Half4 OffsetCameraTarget(Half4 target, Half4 position, float distanceFraction)
+    {
+        var dx = (float)target.X - (float)position.X;
+        var dy = (float)target.Y - (float)position.Y;
+        var dz = (float)target.Z - (float)position.Z;
+        var distance = MathF.Sqrt(dx * dx + dy * dy + dz * dz);
+        var offset = Math.Clamp(distanceFraction, -0.08f, 0.08f) * distance;
+        return target with { Y = SafeHalf((float)target.Y + offset) };
+    }
+
+    private static Half SafeHalf(float value) => (Half)Math.Clamp(value, (float)Half.MinValue, (float)Half.MaxValue);
 
     private static int Blend(byte from, byte to, float amount) =>
         Math.Clamp((int)MathF.Round(from + (to - from) * amount), 0, byte.MaxValue);
 
-    private static byte ScaleByte(byte value, float scale) =>
-        (byte)Math.Clamp((int)MathF.Round(value * scale), 0, byte.MaxValue);
+    private static byte StyleBrightness(byte value, float multiplier, float strength) =>
+        (byte)Blend(value, (byte)Math.Clamp((int)MathF.Round(value * multiplier), 64, byte.MaxValue), strength);
 
     private static float Lerp(float from, float to, float amount) => from + (to - from) * amount;
 

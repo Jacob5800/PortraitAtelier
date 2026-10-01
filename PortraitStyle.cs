@@ -12,8 +12,16 @@ public sealed record PortraitStyle(
     float AmbientBrightness,
     float CameraDistance)
 {
+    /// <summary>
+    /// Small vertical framing adjustment, expressed as a fraction of the camera-to-target distance.
+    /// Zero preserves the captured framing.
+    /// </summary>
+    public float CameraTargetOffset { get; init; }
+
     public static IReadOnlyList<PortraitStyle> Featured { get; } =
     [
+        new PortraitStyle(9, "seamless-showcase", "Seamless Showcase", "Community-inspired", "Clean, balanced light and an open crop inspired by uncluttered portrait layouts.", new(250, 244, 232), new(145, 153, 166), 0.98f, 1.05f, 1.06f) { CameraTargetOffset = 0.015f },
+        new PortraitStyle(10, "weapon-showcase", "Weapon Showcase", "Community-inspired", "A wider crop and clear neutral light keep the captured pose and equipment visible.", new(255, 225, 190), new(125, 137, 157), 1.02f, 1.00f, 1.20f) { CameraTargetOffset = -0.02f },
         new(1, "golden-hour", "Golden Hour", "Warm", "Warm side light with soft amber fill and a modest portrait crop.", new(255, 192, 126), new(112, 77, 61), 1.04f, 0.98f, 0.92f),
         new(2, "moonlit", "Moonlit", "Cool", "Cool blue highlights with a deeper, calm fill.", new(150, 190, 255), new(62, 80, 129), 1.06f, 0.94f, 0.94f),
         new(3, "soft-studio", "Soft Studio", "Clean", "Balanced neutral light designed to keep equipment colors readable.", new(248, 240, 222), new(156, 162, 176), 0.94f, 1.08f, 1.02f),
